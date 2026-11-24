@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login & Helpline Desk - AGCE Student Activity Portal</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="login-body">
+    <div class="login-container">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <h2 style="color: #1e3c72;">Student Activity Portal</h2>
+            <p style="color: #64748b; font-size: 13px;">Arvind Gavali College of Engineering, Satara</p>
+        </div>
+
+        <form id="loginForm">
+            <div class="input-group">
+                <label>Select Role</label>
+                <select id="role" required>
+                    <option value="STUDENT">Student</option>
+                    <option value="FACULTY">Faculty / Coordinator (CS)</option>
+                    <option value="ADMIN">Admin</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>College Email ID</label>
+                <input type="email" id="email" placeholder="e.g. aryan@agce.edu.in" required>
+            </div>
+            <div class="input-group">
+                <label>Password</label>
+                <input type="password" id="password" placeholder="Enter password" required>
+            </div>
+            <div id="errorMessage" class="error-box"></div>
+            <button type="submit" style="width: 100%;">Login</button>
+        </form>
+    </div>
+
+    <!-- Helpline / Complaint Box Desk -->
+    <div class="helpline-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="color: #b45309; font-size: 17px;">Helpline / Complaint Desk</h3>
+            <span class="badge badge-admin">Direct to Admin</span>
+        </div>
+        <p style="font-size: 12.5px; color: #475569; margin-bottom: 12px;">
+            Facing issues with login, certificate verification, PRN, or points? Submit a complaint below. It goes directly to Admin first.
+        </p>
+        <form id="complaintForm">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <input type="text" id="compName" placeholder="Your Full Name" required>
+                <input type="text" id="compPrn" placeholder="PRN Number" required>
+            </div>
+            <select id="compDept" required>
+                <option value="1">Computer Science (CS)</option>
+            </select>
+            <input type="text" id="compSubject" placeholder="Complaint Subject (e.g. Certificate Approval Delay)" required>
+            <textarea id="compDesc" rows="2" placeholder="Describe your issue clearly..." required></textarea>
+            <div id="compSuccess" class="success-box"></div>
+            <div id="compError" class="error-box"></div>
+            <button type="submit" class="btn-warning" style="width: 100%;">Submit Complaint to Admin</button>
+        </form>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080';
+
+        // Load departments into helpline dropdown
+        async function loadDepts() {
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/departments`);
+                if (res.ok) {
+                    const depts = await res.json();
+                    const sel = document.getElementById('compDept');
+                    sel.innerHTML = '';
+                    depts.forEach(d => {
+                        sel.innerHTML += `<option value="${d.dept_id}">${d.dept_name}</option>`;
+                    });
+                }
+            } catch (e) {}
+        }
+        loadDepts();
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const errorBox = document.getElementById('errorMessage');
+            errorBox.style.display = 'none';
+
+            const loginData = {
+                role: document.getElementById('role').value,
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(loginData)
+                });
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    localStorage.setItem('user', JSON.stringify(result.user));
+                    if (result.user.role === 'STUDENT') window.location.href = 'student_dashboard.html';
+                    else if (result.user.role === 'FACULTY') window.location.href = 'faculty_dashboard.html';
+                    else if (result.user.role === 'ADMIN') window.location.href = 'admin_dashboard.html';
+                } else {
+                    errorBox.textContent = result.message || 'Invalid Credentials!';
+                    errorBox.style.display = 'block';
+                }
+            } catch (error) {
+                errorBox.textContent = 'Spring Boot Server is not running on port 8080!';
+                errorBox.style.display = 'block';
+            }
+        });
+
+        document.getElementById('complaintForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const okBox = document.getElementById('compSuccess');
+            const errBox = document.getElementById('compError');
+            okBox.style.display = 'none';
+            errBox.style.display = 'none';
+
+            const payload = {
+                studentName: document.getElementById('compName').value,
+                studentPrn: document.getElementById('compPrn').value,
+                deptId: parseInt(document.getElementById('compDept').value),
+                subject: document.getElementById('compSubject').value,
+                description: document.getElementById('compDesc').value
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/complaints`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    okBox.textContent = 'Complaint submitted to Admin successfully! Admin will review and forward to Faculty.';
+                    okBox.style.display = 'block';
+                    e.target.reset();
+                } else {
+                    errBox.textContent = 'Failed to submit complaint.';
+                    errBox.style.display = 'block';
+                }
+            } catch (err) {
+                errBox.textContent = 'Server offline on port 8080.';
+                errBox.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
